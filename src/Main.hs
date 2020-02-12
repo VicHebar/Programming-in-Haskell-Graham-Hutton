@@ -343,6 +343,60 @@ ticTT g p dep
   | p == X = do putStrLn "Player x is thinking..."
                 (ticTTPlay $! (bestmoveWOD g p dep)) (next' p) dep
 
+-- bestmoveFinal :: Grid -> Player -> Tree (Grid, Player) -> (Grid, Tree (Grid, Player))
+-- bestmoveFinal g p t = if p == plyr then  wnrTuple else bestmoveFinal g p (funcAuxiliar g gs)
+--   where
+--     Node (grd, plyr) gs = t
+--     wnrMovs = [Node(g', p') gs' |  Node (g', p') gs' <- gs, p' == plyr]
+--     Node (gW, pW) gWs = head wnrMovs
+--     wnrTuple = (gW, Node (gW, pW) gWs)
+
+bestmoveFinal :: Grid -> Player -> Tree (Grid, Player) -> (Grid, Tree (Grid, Player))
+bestmoveFinal g p t = head [(grds', Node (grds', plyr') gs) | Node (grds', plyr') gs <- ts', plyr' == p]
+  where
+    Node (_, _) ts = t
+    Node (grds, plyr) ts' = funcAuxiliar g ts
+
+funcAuxiliar :: Grid -> [Tree (Grid, Player)] -> Tree (Grid, Player)
+funcAuxiliar _ [t] = t
+funcAuxiliar g (t:ts) = if g == g' then t else funcAuxiliar g ts
+  where
+    Node (g', _) _ = t
+
+subMain2 :: IO ()
+subMain2 = do putStrLn "Give me the depth: "
+              dep <- getNat ""
+              gameRoll dep 
+
+gameRoll :: Int -> IO ()
+gameRoll dep = do putStrLn "Do you wanna go first? (y/n)"
+                  op <- getChar
+                  case op of
+                    'y' -> do let tree = prune dep  (gametree empty O)
+                                  miniTree = minimax tree
+                              ticTTPlayFinal empty O miniTree
+                    --'n' -> 
+                    otherwise -> gameRoll dep
+
+ticTTPlayFinal :: Grid -> Player -> Tree (Grid, Player) -> IO ()
+ticTTPlayFinal g p t = do cls
+                          goto (1,1)
+                          putGrid g
+                          ticTTFinal g p t
+
+ticTTFinal :: Grid -> Player -> Tree (Grid, Player) -> IO ()
+ticTTFinal g p t
+  | wins g O = putStrLn "O wins."
+  | wins g X = putStrLn "X wins."
+  | full g = putStrLn "It's a draw."
+  | p == O = do i <- getNat (prompt p)
+                case move g i p of
+                  [] -> do putStrLn "ERROR: Invalid move."
+                           ticTTPlayFinal g p t
+                  [g'] -> ticTTPlayFinal g' (next' p) t
+  | p == X = do putStrLn "Player X is thinking..."
+                let (g', t') = bestmoveFinal g p t
+                ticTTPlayFinal g' (next' p) t'
 
 main :: IO ()
 main = do def <- getLine
