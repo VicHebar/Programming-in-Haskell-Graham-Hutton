@@ -162,6 +162,13 @@ turn g = if os <= xs then O else X
     xs = length (filter (== X) ps)
     ps = concat g
 
+turn' :: Grid -> Player
+turn' g = if os < xs then O else X
+  where
+    os = length (filter (== O) ps)
+    xs = length (filter (== X) ps)
+    ps = concat g
+
 wins :: Grid -> Player -> Bool
 wins g p = any line (rows ++ cols ++ dias)
   where
@@ -281,11 +288,14 @@ minimax' (Node g [])
   | wins g X = Node (g, X) []
   | otherwise = Node (g, B) []
 minimax' (Node g ts)
-  | turn g == O = Node (g, maximum ps) ts'
-  | turn g == X = Node (g, minimum ps) ts'
+  | turn' g == O = Node (g, minimum ps) ts'
+  | turn' g == X = Node (g, maximum ps) ts'
     where
       ts' = map minimax' ts
       ps = [p | Node (_, p) _ <- ts']
+
+minMax :: Player -> (Tree Grid -> Tree (Grid, Player))
+minMax p = if p == O then minimax else minimax' 
 
 bestmove :: Grid -> Player -> Grid
 bestmove g p = head [g' | Node (g', p') _ <- ts, p' == best]
@@ -351,52 +361,55 @@ ticTT g p dep
 --     Node (gW, pW) gWs = head wnrMovs
 --     wnrTuple = (gW, Node (gW, pW) gWs)
 
-bestmoveFinal :: Grid -> Player -> Tree (Grid, Player) -> (Grid, Tree (Grid, Player))
-bestmoveFinal g p t = head [(grds', Node (grds', plyr') gs) | Node (grds', plyr') gs <- ts', plyr' == p]
+bestmoveFinal :: Grid -> Player -> Player -> Tree Grid -> (Grid, Tree Grid)
+bestmoveFinal g p fp t = head [(g', funcAuxiliar g' ts') | Node (g', p') _ <- ts, p' == plyr]
   where
-    Node (_, _) ts = t
-    Node (grds, plyr) ts' = funcAuxiliar g ts
+    Node (grds, plyr) ts = (minMax fp)  t
+    Node grd' ts' = t
 
-funcAuxiliar :: Grid -> [Tree (Grid, Player)] -> Tree (Grid, Player)
+funcAuxiliar :: Grid -> [Tree Grid] -> Tree Grid
 funcAuxiliar _ [t] = t
 funcAuxiliar g (t:ts) = if g == g' then t else funcAuxiliar g ts
   where
-    Node (g', _) _ = t
+    Node g' _ = t
 
 subMain2 :: IO ()
-subMain2 = do putStrLn "Give me the depth: "
-              dep <- getNat ""
+subMain2 = do dep <- getNat "Give me the depth: "
               gameRoll dep 
 
 gameRoll :: Int -> IO ()
 gameRoll dep = do putStrLn "Do you wanna go first? (y/n)"
                   op <- getChar
                   case op of
-                    'y' -> do let tree = prune dep  (gametree empty O)
-                                  miniTree = minimax tree
-                              ticTTPlayFinal empty O miniTree
-                    --'n' -> 
+                    'y' -> do let tree = prune dep (gametree empty O)
+                              ticTTPlayFinal empty O O tree
+                    'n' -> do let tree = prune dep (gametree empty X)
+                              ticTTPlayFinal empty X X tree
                     otherwise -> gameRoll dep
 
-ticTTPlayFinal :: Grid -> Player -> Tree (Grid, Player) -> IO ()
-ticTTPlayFinal g p t = do cls
-                          goto (1,1)
-                          putGrid g
-                          ticTTFinal g p t
+ticTTPlayFinal :: Grid -> Player -> Player -> Tree Grid -> IO ()
+ticTTPlayFinal g p fp t = do cls
+                             goto (1,1)
+                             putGrid g
+                             ticTTFinal g p fp t
 
-ticTTFinal :: Grid -> Player -> Tree (Grid, Player) -> IO ()
-ticTTFinal g p t
+ticTTFinal :: Grid -> Player -> Player -> Tree Grid -> IO ()
+ticTTFinal g p fp t
   | wins g O = putStrLn "O wins."
   | wins g X = putStrLn "X wins."
   | full g = putStrLn "It's a draw."
   | p == O = do i <- getNat (prompt p)
                 case move g i p of
                   [] -> do putStrLn "ERROR: Invalid move."
-                           ticTTPlayFinal g p t
-                  [g'] -> ticTTPlayFinal g' (next' p) t
+                           ticTTPlayFinal g p fp t
+                  [g'] -> do let Node grd ts = t
+                                 t' = funcAuxiliar g' ts
+                             ticTTPlayFinal g' (next' p) fp t'
   | p == X = do putStrLn "Player X is thinking..."
-                let (g', t') = bestmoveFinal g p t
-                ticTTPlayFinal g' (next' p) t'
+                let (g', t') = bestmoveFinal g p fp t
+                ticTTPlayFinal g' (next' p) fp t'
+    
+
 
 main :: IO ()
 main = do def <- getLine
