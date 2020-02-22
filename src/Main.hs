@@ -375,7 +375,7 @@ funcAuxiliar g (t:ts) = if g == g' then t else funcAuxiliar g ts
 
 subMain2 :: IO ()
 subMain2 = do dep <- getNat "Give me the depth: "
-              gameRoll dep 
+              gameRoll dep
 
 gameRoll :: Int -> IO ()
 gameRoll dep = do putStrLn "Do you wanna go first? (y/n)"
@@ -408,8 +408,6 @@ ticTTFinal g p fp t
   | p == X = do putStrLn "Player X is thinking..."
                 let (g', t') = bestmoveFinal g p fp t
                 ticTTPlayFinal g' (next' p) fp t'
-    
-
 
 main :: IO ()
 main = do def <- getLine
@@ -683,3 +681,36 @@ defPlay = do
             case d of
               'y' -> play3 empty O
               'n' -> play4'' empty
+
+------------------------------------------21/02/2020
+
+data Tree' a = Lf a | Nd (Tree' a) (Tree' a) deriving Show
+
+tree' :: Tree' Char
+tree' = Nd (Nd (Lf 'a') (Lf 'b')) (Lf 'c')
+
+type State = Int
+
+newtype ST a = S (State -> (a,State))
+
+app :: ST a -> State -> (a,State)
+app (S st) x = st x
+
+instance Functor ST where
+  fmap g st = S(\s -> let (x, s') = app st s in (g x, s'))
+
+instance Applicative ST where
+  pure x = S(\s -> (x, s))
+  stf <*> stx = S(\s ->
+                    let (f, s') = app stf s
+                        (x, s'') = app stx s' in (f x, s''))
+
+instance Monad ST where
+  st >>= f = S(\s -> let (x, s') = app st s in app (f x) s')
+
+fresh :: ST Int
+fresh = S(\n -> (n, n+1))
+
+alabel :: Tree' a -> ST (Tree' Int)
+alabel (Lf _) = Lf <$> fresh
+alabel (Nd l r) = Nd <$> alabel l <*> alabel r
