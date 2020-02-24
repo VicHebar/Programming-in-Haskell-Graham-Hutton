@@ -4,6 +4,8 @@ module Main where
 import Data.Char
 import Data.List
 import System.IO
+import Control.Monad
+import Control.Applicative hiding (empty)
 import System.Random hiding (split)
 
 --main :: IO ()
@@ -714,3 +716,51 @@ fresh = S(\n -> (n, n+1))
 alabel :: Tree' a -> ST (Tree' Int)
 alabel (Lf _) = Lf <$> fresh
 alabel (Nd l r) = Nd <$> alabel l <*> alabel r
+
+mlabel :: Tree' a -> ST (Tree' Int)
+mlabel (Lf _) = do n <- fresh
+                   return (Lf n)
+mlabel (Nd l r) = do l' <- mlabel l
+                     r' <- mlabel r
+                     return (Nd l' r')
+
+filterM' :: Monad m => (a -> m Bool) -> [a] -> m [a]
+filterM' f [] = return []
+filterM' f (x:xs) = f x >>= (\b -> (filterM' f xs) >>= (\ys -> return (if b then x:ys else ys)))
+
+--instance Monad [] where
+  -- (>>=) :: [a] -> (a -> [b]) -> [b]
+--  xs >>= f = [y | x <- xs, y <- f x]
+
+--12.5 1
+
+data TREE a = LEF | ND (TREE a) a (TREE a) deriving Show
+
+instance Functor TREE where
+  fmap _ LEF = LEF
+  fmap f (ND l x r) = ND (fmap f l) (f x) (fmap f r)
+
+--12.5 4
+
+newtype ZipList' a = Z [a] deriving Show
+
+instance Functor ZipList' where
+  fmap g (Z xs) = Z $ map g xs
+
+instance Applicative ZipList' where
+  pure x = Z $ repeat x
+  (Z gs) <*> (Z xs) = Z [g x | (g, x) <- zip gs xs]
+
+--12.5 7
+
+data Expr' a = Var' a | Val' Int | Add' (Expr' a) (Expr' a) deriving Show
+
+instance Functor Expr' where
+  fmap g (Var' v) = Var' $ g v
+  fmap _ (Val' i) = Val' i
+  fmap g (Add' l r) = Add' (fmap g l)  (fmap g r)
+
+instance Applicative Expr' where
+  pure x = Var' x
+  (Var' f) <*> x = fmap f x
+  (Add' l r) <*> (Var' x) = Add' (l <*> x) (r <*> x)
