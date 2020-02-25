@@ -763,4 +763,16 @@ instance Functor Expr' where
 instance Applicative Expr' where
   pure x = Var' x
   (Var' f) <*> x = fmap f x
-  (Add' l r) <*> (Var' x) = Add' (l <*> x) (r <*> x)
+  (Val' i) <*> x = Val' i
+  (Add' l r) <*> (Add' l' r') = Add' (l <*> l') (r <*> r')
+  (Add' l r) <*> x = Add' (l <*> x) (r <*> x)
+
+instance Monad Expr' where
+  (Var' x) >>= f = f x
+  (Val' i) >>= _ = Val' i
+  (Add' l r) >>= f = Add' (l >>= f) (r >>= f)
+
+-- data Maybe a = N | J a
+
+-- data Reader a b = {runreader :: a -> b}
+-- type ((->) a) b = \a -> b
