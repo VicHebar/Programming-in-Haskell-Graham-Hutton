@@ -698,35 +698,35 @@ newtype ST a = S (State -> (a,State))
 app :: ST a -> State -> (a,State)
 app (S st) x = st x
 
-instance Functor ST where
-  fmap g st = S(\s -> let (x, s') = app st s in (g x, s'))
+-- instance Functor ST where
+--   fmap g st = S(\s -> let (x, s') = app st s in (g x, s'))
 
-instance Applicative ST where
-  pure x = S(\s -> (x, s))
-  stf <*> stx = S(\s ->
-                    let (f, s') = app stf s
-                        (x, s'') = app stx s' in (f x, s''))
+-- instance Applicative ST where
+--   pure x = S(\s -> (x, s))
+--   stf <*> stx = S(\s ->
+--                     let (f, s') = app stf s
+--                         (x, s'') = app stx s' in (f x, s''))
 
-instance Monad ST where
-  st >>= f = S(\s -> let (x, s') = app st s in app (f x) s')
+-- instance Monad ST where
+--   st >>= f = S(\s -> let (x, s') = app st s in app (f x) s')
 
-fresh :: ST Int
-fresh = S(\n -> (n, n+1))
+-- fresh :: ST Int
+-- fresh = S(\n -> (n, n+1))
 
-alabel :: Tree' a -> ST (Tree' Int)
-alabel (Lf _) = Lf <$> fresh
-alabel (Nd l r) = Nd <$> alabel l <*> alabel r
+-- alabel :: Tree' a -> ST (Tree' Int)
+-- alabel (Lf _) = Lf <$> fresh
+-- alabel (Nd l r) = Nd <$> alabel l <*> alabel r
 
-mlabel :: Tree' a -> ST (Tree' Int)
-mlabel (Lf _) = do n <- fresh
-                   return (Lf n)
-mlabel (Nd l r) = do l' <- mlabel l
-                     r' <- mlabel r
-                     return (Nd l' r')
+-- mlabel :: Tree' a -> ST (Tree' Int)
+-- mlabel (Lf _) = do n <- fresh
+--                    return (Lf n)
+-- mlabel (Nd l r) = do l' <- mlabel l
+--                      r' <- mlabel r
+--                      return (Nd l' r')
 
-filterM' :: Monad m => (a -> m Bool) -> [a] -> m [a]
-filterM' f [] = return []
-filterM' f (x:xs) = f x >>= (\b -> (filterM' f xs) >>= (\ys -> return (if b then x:ys else ys)))
+-- filterM' :: Monad m => (a -> m Bool) -> [a] -> m [a]
+-- filterM' f [] = return []
+-- filterM' f (x:xs) = f x >>= (\b -> (filterM' f xs) >>= (\ys -> return (if b then x:ys else ys)))
 
 --instance Monad [] where
   -- (>>=) :: [a] -> (a -> [b]) -> [b]
@@ -743,10 +743,10 @@ instance Functor TREE where
 
 --12.5 2
 
-data (->>) a b = R(a -> b)
+--data (->>) a b = R(a -> b)
 
-instance Functor ((->>) a) where
-  fmap = (.)
+-- instance Functor ((->) a) where
+--   fmap = (.)
 
 --12.5 4
 
@@ -779,6 +779,16 @@ instance Monad Expr' where
   (Var' x) >>= f = f x
   (Val' i) >>= _ = Val' i
   (Add' l r) >>= f = Add' (l >>= f) (r >>= f)
+
+--12.5 8
+
+instance Monad ST where
+  st >>= f = S(\s -> let (x,s') = app st s in app (f x) s')
+
+--instance Functor where
+  --fmap :: (a -> b) -> ST a -> ST b
+  --fmap g st = do f <- st
+                 
 
 -- data Maybe a = N | J a
 
