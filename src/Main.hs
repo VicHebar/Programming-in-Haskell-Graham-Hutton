@@ -740,6 +740,14 @@ instance Functor TREE where
   fmap _ LEF = LEF
   fmap f (ND l x r) = ND (fmap f l) (f x) (fmap f r)
 
+
+--12.5 2
+
+data (->>) a b = R(a -> b)
+
+instance Functor ((->>) a) where
+  fmap = (.)
+
 --12.5 4
 
 newtype ZipList' a = Z [a] deriving Show
@@ -776,3 +784,7 @@ instance Monad Expr' where
 
 -- data Reader a b = {runreader :: a -> b}
 -- type ((->) a) b = \a -> b
+
+
+-- fmap :: (x -> y) -> ((->) a) x -> ((->) b)
+-- fmap = (.) 
