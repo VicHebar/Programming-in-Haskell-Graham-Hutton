@@ -7,6 +7,8 @@ import System.IO
 import Control.Monad
 import Control.Applicative hiding (empty)
 import System.Random hiding (split)
+--import qualified Data.Map.Lazy as Map
+import qualified Data.Map.Strict as Map
 
 --main :: IO ()
 --main = putStrLn "h"
@@ -60,10 +62,6 @@ inter as bs = [a | a <- as, elem a as && elem a bs]
 
 union' :: [a] -> [a] -> [a]
 union' as bs = as ++ bs
-
-
-
-
 
 longitud :: String -> Int
 longitud [] = 0
@@ -782,8 +780,8 @@ instance Monad Expr' where
 
 --12.5 8
 
-instance Monad ST where
-  st >>= f = S(\s -> let (x,s') = app st s in app (f x) s')
+-- instance Monad ST where
+--   st >>= f = S(\s -> let (x,s') = app st s in app (f x) s')
 
 --instance Functor where
   --fmap :: (a -> b) -> ST a -> ST b
@@ -798,3 +796,52 @@ instance Monad ST where
 
 -- fmap :: (x -> y) -> ((->) a) x -> ((->) b)
 -- fmap = (.) 
+
+-- newtype Parser a = P (String -> [(a, String)])
+
+-- parse :: Parser a ->  String -> [(a, String)]
+-- parse (P pr) inp = pr inp
+
+-- item :: Parser Char
+-- item = P (\inp -> case inp of
+--              [] -> []
+--              (x:xs) -> [(x,xs)])
+
+-- instance Functor Parser where
+--   fmap g p = P (\inp -> case parse p inp of
+--                    [] -> []
+--                    [(v,out)] -> [(g v, out)])
+
+-- instance Applicative Parser where
+--   pure v = P (\inp -> [(v, inp)])
+--   pg <*> px = P (\inp -> case parse pg inp of
+--                            [] -> []
+--                            [(g, out)] -> parse (fmap g px) out)
+
+-- instance Monad Parser where
+--   p >>= f = P (\inp -> case parse p int of
+--                          [] -> []
+--                          [(v,out)] -> parse (f v) out)
+
+-- threePar :: Parser (Char, Char)
+-- threePar = pure g <*> item <*> item <*> item
+--   where g x y z = (x, z)
+
+-- threeParMnd :: Parser (Char,Char)
+-- threeParMnd = item >>= (\x -> item >>= (\y -> item >>= (\z -> return (x, z))))
+
+-- instance Alternative Parser where
+--   empty = P(\inp -> [])
+--   p <|> q = P(\inp -> case parse p int of
+--                  [] -> parse q int
+--                  [(v, out)] -> [(v, out)])
+
+-- sat :: (Char -> Bool) -> Parser Char
+-- sat p = item >>= (\x -> if p x then return x else empty)
+
+-- char :: Char -> Parser Char
+-- char x = sat (== x)
+
+-- string :: String -> Parser String
+-- string [] = return []
+-- string (x:xs) = char x >>= (\y -> string xs >>= (\z -> return (x:xs)))
