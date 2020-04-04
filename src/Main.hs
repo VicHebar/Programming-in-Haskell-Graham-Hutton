@@ -7,8 +7,9 @@ import System.IO
 import Control.Monad
 import Control.Applicative hiding (empty)
 import System.Random hiding (split)
+import Control.Applicative
 --import qualified Data.Map.Lazy as Map
-import qualified Data.Map.Strict as Map
+--import qualified Data.Map.Strict as Map
 
 --main :: IO ()
 --main = putStrLn "h"
@@ -146,8 +147,8 @@ next' O = X
 next' B = B
 next' X = O
 
-empty :: Grid
-empty = replicate size (replicate size B)
+emptyG :: Grid
+emptyG = replicate size (replicate size B)
 
 empty' :: Grid
 empty' = replicate size (replicate size O)
@@ -229,7 +230,7 @@ prompt :: Player -> String
 prompt p = "Player " ++ show p ++ ", enter your move: "
 
 tictactoe :: IO ()
-tictactoe = run empty O
+tictactoe = run emptyG O
 
 run :: Grid -> Player -> IO ()
 run g p = do cls
@@ -332,7 +333,7 @@ bestmoveWOD g p dep = head [g' | Node (g', p') _ <- ts, p' == best]
 subMain :: IO ()
 subMain = do putStrLn "Give me the depth: "
              dep <- getNat ""
-             ticTTPlay empty O dep
+             ticTTPlay emptyG O dep
 
 ticTTPlay :: Grid -> Player -> Int -> IO ()
 ticTTPlay g p dep = do cls
@@ -381,10 +382,10 @@ gameRoll :: Int -> IO ()
 gameRoll dep = do putStrLn "Do you wanna go first? (y/n)"
                   op <- getChar
                   case op of
-                    'y' -> do let tree = prune dep (gametree empty O)
-                              ticTTPlayFinal empty O O tree
-                    'n' -> do let tree = prune dep (gametree empty X)
-                              ticTTPlayFinal empty X X tree
+                    'y' -> do let tree = prune dep (gametree emptyG O)
+                              ticTTPlayFinal emptyG O O tree
+                    'n' -> do let tree = prune dep (gametree emptyG X)
+                              ticTTPlayFinal emptyG X X tree
                     otherwise -> gameRoll dep
 
 ticTTPlayFinal :: Grid -> Player -> Player -> Tree Grid -> IO ()
@@ -411,7 +412,7 @@ ticTTFinal g p fp t
 
 main :: IO ()
 main = do def <- getLine
-          play3 empty O
+          play3 emptyG O
 
 play3 :: Grid -> Player -> IO ()
 play3 g p = do cls
@@ -679,8 +680,8 @@ defPlay = do
             putStrLn "Do you wanna go first? y/n"
             d <- getChar
             case d of
-              'y' -> play3 empty O
-              'n' -> play4'' empty
+              'y' -> play3 emptyG O
+              'n' -> play4'' emptyG
 
 ------------------------------------------21/02/2020
 
@@ -797,51 +798,235 @@ instance Monad Expr' where
 -- fmap :: (x -> y) -> ((->) a) x -> ((->) b)
 -- fmap = (.) 
 
--- newtype Parser a = P (String -> [(a, String)])
+newtype Parser a = P (String -> [(a, String)])
 
--- parse :: Parser a ->  String -> [(a, String)]
--- parse (P pr) inp = pr inp
+parse :: Parser a ->  String -> [(a, String)]
+parse (P pr) inp = pr inp
 
--- item :: Parser Char
--- item = P (\inp -> case inp of
---              [] -> []
---              (x:xs) -> [(x,xs)])
+item :: Parser Char
+item = P (\inp -> case inp of
+             [] -> []
+             (x:xs) -> [(x,xs)])
 
--- instance Functor Parser where
---   fmap g p = P (\inp -> case parse p inp of
---                    [] -> []
---                    [(v,out)] -> [(g v, out)])
+instance Functor Parser where
+  fmap g p = P (\inp -> case parse p inp of
+                   [] -> []
+                   [(v,out)] -> [(g v, out)])
 
--- instance Applicative Parser where
---   pure v = P (\inp -> [(v, inp)])
---   pg <*> px = P (\inp -> case parse pg inp of
---                            [] -> []
---                            [(g, out)] -> parse (fmap g px) out)
+instance Applicative Parser where
+  pure v = P (\inp -> [(v, inp)])
+  pg <*> px = P (\inp -> case parse pg inp of
+                           [] -> []
+                           [(g, out)] -> parse (fmap g px) out)
+  
+instance Monad Parser where
+  p >>= f = P (\inp -> case parse p inp of
+                         [] -> []
+                         [(v,out)] -> parse (f v) out)
 
--- instance Monad Parser where
---   p >>= f = P (\inp -> case parse p int of
---                          [] -> []
---                          [(v,out)] -> parse (f v) out)
+threePar :: Parser (Char, Char)
+threePar = pure g <*> item <*> item <*> item
+  where g x y z = (x, z)
 
--- threePar :: Parser (Char, Char)
--- threePar = pure g <*> item <*> item <*> item
---   where g x y z = (x, z)
+threeParMnd :: Parser (Char,Char)
+threeParMnd = do x <- item
+                 item
+                 z <- item
+                 return (x, z)
 
--- threeParMnd :: Parser (Char,Char)
--- threeParMnd = item >>= (\x -> item >>= (\y -> item >>= (\z -> return (x, z))))
+instance Alternative Parser where
+  empty = P(\inp -> [])
+  p <|> q = P(\inp -> case parse p inp of
+                 [] -> parse q inp
+                 [(v, out)] -> [(v, out)])
 
--- instance Alternative Parser where
---   empty = P(\inp -> [])
---   p <|> q = P(\inp -> case parse p int of
---                  [] -> parse q int
---                  [(v, out)] -> [(v, out)])
+sat :: (Char -> Bool) -> Parser Char
+sat p = do x <- item
+           if p x then return x else empty
 
--- sat :: (Char -> Bool) -> Parser Char
--- sat p = item >>= (\x -> if p x then return x else empty)
+char :: Char -> Parser Char
+char x = sat (== x)
 
--- char :: Char -> Parser Char
--- char x = sat (== x)
+string :: String -> Parser String
+string [] = return []
+string (x:xs) = do char x
+                   string xs
+                   return (x:xs)
 
--- string :: String -> Parser String
--- string [] = return []
--- string (x:xs) = char x >>= (\y -> string xs >>= (\z -> return (x:xs)))
+lower :: Parser Char
+lower = sat isLower
+
+alphanum :: Parser Char
+alphanum = sat isAlphaNum
+
+digit :: Parser Char
+digit = sat isDigit
+
+ident :: Parser String
+ident = lower >>= (\x -> (many alphanum) >>= (\xs -> return (x:xs)))
+
+nat :: Parser Int
+nat = do xs <- some digit
+         return (read xs)
+
+space :: Parser ()
+space = do many $ sat isSpace
+           return ()
+
+int :: Parser Int
+int = do char '-'
+         n <- nat
+         return (-n)
+  <|> nat
+
+token :: Parser a -> Parser a
+token p = do space
+             v <- p
+             space
+             return v
+
+natural :: Parser Int
+natural = token nat
+
+symbol :: String -> Parser String
+symbol xs = token (string xs)
+
+nats :: Parser [Int]
+nats = do symbol "["
+          n <- natural
+          ns <- many (do symbol ","
+                         natural)
+          symbol "]"
+          return (n:ns)
+
+-- Exp parsers
+
+someRandFunc :: Int -> Parser Int
+someRandFunc t = do symbol "+"
+                    e <- expr
+                    return $ t + e
+
+expr :: Parser Int
+expr = do t <- term
+          someRandFunc t <|> return t
+
+term :: Parser Int
+term = do f <- factor
+          do symbol "*"
+             t <- term
+             return $ f * t
+           <|> return f
+
+factor :: Parser Int
+factor = do symbol "("
+            e <- expr
+            symbol ")"
+            return e
+          <|> natural
+
+-- Calculator
+
+writeat :: Pos -> String -> IO ()
+writeat p xs = do goto p
+                  putStr xs
+
+box :: [String]
+box = [ "+---------------+",
+        "+---+---+---+---+",
+        "| q | c | d | = |",
+        "| 1 | 2 | 3 | + |",
+        "| 4 | 5 | 6 | - |",
+        "| 7 | 8 | 9 | * |",
+        "| 0 | ( | ) | / |"]
+
+buttons :: String
+buttons = standar ++ extra
+  where
+    standar = "qdc=123+456-789*0()/"
+    extra = "QCD \ESC\BS\DEL\n"
+
+showbox :: IO ()
+showbox = sequence_ [ writeat (1, y) b | (y, b) <- zip [1..] box]
+
+display xs = do writeat (3,2) (replicate 13 ' ')
+                writeat (3,2) (reverse (take 13 (reverse xs)))
+
+calc :: String -> IO ()
+calc xs = do display xs
+             c <- getChar
+             if elem c buttons then
+               process c xs
+             else
+               do beep
+                  calc xs
+
+process :: Char -> String -> IO ()
+process c xs | elem c "qQ\ESC"    = quit
+             | elem c "dD\BS\DEL" = deleteP xs
+             | elem c "=\n"       = evalP xs
+             | elem c "cC"        = clear
+             | otherwise          = press c xs
+
+quit :: IO ()
+quit = goto (1,14)
+
+deleteP :: String -> IO ()
+deleteP [] = calc []
+deleteP xs = calc $ init xs
+
+evalP :: String -> IO ()
+evalP xs = case parse expr xs of
+            [(n, [])] -> calc $ show n
+            _         -> do beep
+                            calc xs
+
+clear :: IO ()
+clear = calc []
+
+press :: Char -> String -> IO ()
+press c xs = calc $ xs ++ [c]
+
+beep :: IO ()
+beep = putStr "\BELL"
+
+runPar :: IO ()
+runPar = do cls
+            showbox
+            clear
+
+comment :: Parser ()
+comment = do many $ token alphanum
+             string "--"
+             space
+             -- xs <- many item
+             -- char '\n'
+             return ()
+
+comment' :: Parser ()
+comment' = do string "--"
+              many item
+              char '\n'
+              return ()
+
+caracter :: Parser ()
+caracter = P (\inp -> case inp of
+                   [] -> []
+                   [x] -> []
+                   (x:y:xs) -> if and [ x == '-', y == '-' ] then [((), xs)] else parse caracter (y:xs))
+
+endLine :: Parser Char
+endLine = P (\inp -> case inp of
+                       []     -> []
+                       (x:xs) -> if x == '\n' then [] else [(x, xs)])
+
+comment'' :: Parser ()
+comment'' = do string "--"
+               many endLine
+               item
+               return ()
+
+invi :: [(a, String)] -> [(String, a)]
+invi (a:as) = [(snd a, fst a)]
+
+-- carac :: Char -> Parser [Char]
+-- carac c = many $ caracter c
